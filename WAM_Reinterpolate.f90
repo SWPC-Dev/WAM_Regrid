@@ -402,11 +402,11 @@ CONTAINS
 
       CALL Check( nf90_def_var( ncid, "latitude", NF90_DOUBLE, y_dimid, y_varid ) )
       CALL Check( nf90_put_att( ncid, y_varid, "long_name", "Geographic Latitude" ) )
-      CALL Check( nf90_put_att( ncid, y_varid, "units", "degrees north" ) )
+      CALL Check( nf90_put_att( ncid, y_varid, "units", "degrees_north" ) )
 
       CALL Check( nf90_def_var( ncid, "longitude", NF90_DOUBLE, x_dimid, x_varid ) )
       CALL Check( nf90_put_att( ncid, x_varid, "long_name", "Geographic Longitude" ) )
-      CALL Check( nf90_put_att( ncid, x_varid, "units", "degrees east" ) )
+      CALL Check( nf90_put_att( ncid, x_varid, "units", "degrees_east" ) )
 
       CALL Check( nf90_def_var( ncid, "time", NF90_INT, time_dimid, time_varid ) )
       CALL Check( nf90_put_att( ncid, time_varid, "long_name", "minutes since an unknown time" ) )
@@ -424,7 +424,7 @@ CONTAINS
 
       CALL Check( nf90_put_var( ncid, x_varid, lon ) )
       CALL Check( nf90_put_var( ncid, y_varid, lat ) )
-      CALL Check( nf90_put_var( ncid, z_varid, z_regridded ) )
+      CALL Check( nf90_put_var( ncid, z_varid, z_regridded + 6371.0D0 ) )
       CALL Check( nf90_put_var( ncid, time_varid, time ) )
       CALL Check( nf90_put_var( ncid, temperature_varid, regridded_temperature, recStart, recCount ) )
       CALL Check( nf90_put_var( ncid, density_varid, regridded_density, recStart, recCount ) )
