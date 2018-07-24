@@ -6,9 +6,9 @@ IMPLICIT NONE
 
   ! /////////////////////////////////////////////////// !
 
-  INTEGER, PARAMETER :: n_regridded_levels = 20
-  REAL(8), PARAMETER :: z0_regridded       = 100.0D0
-  REAL(8), PARAMETER :: zM_regridded       = 300.0D0
+  INTEGER, PARAMETER :: n_regridded_levels = 50
+  REAL(8), PARAMETER :: z0_regridded       = 50.0D0
+  REAL(8), PARAMETER :: zM_regridded       = 400.0D0
 
 
   ! /////////////////////////////////////////////////// !
@@ -33,6 +33,7 @@ IMPLICIT NONE
   REAL(8), ALLOCATABLE :: regridded_density_reordered(:,:,:,:)
   REAL(8), ALLOCATABLE :: lat(:)
   REAL(8), ALLOCATABLE :: lon(:)
+  REAL(8), ALLOCATABLE :: x(:,:,:), y(:,:,:), z(:,:,:)
   INTEGER, ALLOCATABLE :: time(:)
   CHARACTER(200)       :: inputFile, outputFile
   LOGICAL :: success
@@ -42,7 +43,12 @@ IMPLICIT NONE
 
   IF( success )THEN
 
+
     CALL Read_NetCDF( inputFile )
+
+    lat = lat*90.0/88.5419616699219
+
+!    CALL Convert_to_XYZ( )
 
     CALL Reorder_Pressure_Arrays( )
 
@@ -237,6 +243,8 @@ CONTAINS
                  lat, &
                  lon, &
                  time )
+
+      DEALLOCATE( x, y, z )
     
   END SUBROUTINE Cleanup
 !
@@ -256,6 +264,10 @@ CONTAINS
             lat(1:n_lat), &
             lon(1:n_lon), &
             time(1:n_time) )
+
+  ALLOCATE( x(1:n_lon,1:n_lat,1:n_regridded_levels), &
+            y(1:n_lon,1:n_lat,1:n_regridded_levels), &
+            z(1:n_lon,1:n_lat,1:n_regridded_levels) )
 
   END SUBROUTINE Allocate_Arrays
 
@@ -299,6 +311,23 @@ CONTAINS
     ENDDO
 
   END SUBROUTINE Reorder_Regridded_Arrays
+
+  SUBROUTINE Convert_to_XYZ( )
+    INTEGER :: i, j, k
+
+    DO k = 1, n_regridded_levels
+      DO j = 1, n_lat
+        DO i = 1, n_lon
+ 
+          x(i,j,k) = ( z_regridded(k) + 6371.0D0 )*sin( 3.141592653D0*lon(i)/180.0D0 )*cos( 3.141592653D0*lat(i)/180.0D0 )
+          y(i,j,k) = ( z_regridded(k) + 6371.0D0 )*cos( 3.141592653D0*lon(i)/180.0D0 )*cos( 3.141592653D0*lat(i)/180.0D0 )
+          z(i,j,k) = ( z_regridded(k) + 6371.0D0 )*sin( 3.141592653D0*lat(i)/180.0D0 )
+
+        ENDDO
+      ENDDO
+    ENDDO
+
+  END SUBROUTINE Convert_to_XYZ
 
   SUBROUTINE Read_NetCDF( filename )
     CHARACTER(*), INTENT(in) :: filename
@@ -361,24 +390,25 @@ CONTAINS
 
       CALL Check( nf90_create( TRIM(filename), NF90_NETCDF4, ncid))
 
-      CALL Check( nf90_def_dim( ncid, "Z", n_regridded_levels, z_dimid ) ) 
-      CALL Check( nf90_def_dim( ncid, "longitude", n_lon, x_dimid ) ) 
       CALL Check( nf90_def_dim( ncid, "latitude", n_lat, y_dimid ) ) 
-      CALL Check( nf90_def_dim( ncid, "T", NF90_UNLIMITED, time_dimid ) )
+      CALL Check( nf90_def_dim( ncid, "longitude", n_lon, x_dimid ) ) 
+      CALL Check( nf90_def_dim( ncid, "z", n_regridded_levels, z_dimid ) ) 
+      CALL Check( nf90_def_dim( ncid, "time", NF90_UNLIMITED, time_dimid ) )
 
-      CALL Check( nf90_def_var( ncid, "Z", NF90_DOUBLE, z_dimid, z_varid ) )
+      CALL Check( nf90_def_var( ncid, "z", NF90_DOUBLE, z_dimid, z_varid ) )
       CALL Check( nf90_put_att( ncid, z_varid, "long_name", "Radial Distance" ) )
       CALL Check( nf90_put_att( ncid, z_varid, "units", "km" ) )
-
-      CALL Check( nf90_def_var( ncid, "longitude", NF90_DOUBLE, x_dimid, x_varid ) )
-      CALL Check( nf90_put_att( ncid, x_varid, "long_name", "Geodesic Longitude" ) )
-      CALL Check( nf90_put_att( ncid, x_varid, "units", "degrees east" ) )
+      CALL Check( nf90_put_att( ncid, z_varid, "units", "km" ) )
 
       CALL Check( nf90_def_var( ncid, "latitude", NF90_DOUBLE, y_dimid, y_varid ) )
-      CALL Check( nf90_put_att( ncid, y_varid, "long_name", "Geodesic Latitude" ) )
+      CALL Check( nf90_put_att( ncid, y_varid, "long_name", "Geographic Latitude" ) )
       CALL Check( nf90_put_att( ncid, y_varid, "units", "degrees north" ) )
 
-      CALL Check( nf90_def_var( ncid, "T", NF90_INT, time_dimid, time_varid ) )
+      CALL Check( nf90_def_var( ncid, "longitude", NF90_DOUBLE, x_dimid, x_varid ) )
+      CALL Check( nf90_put_att( ncid, x_varid, "long_name", "Geographic Longitude" ) )
+      CALL Check( nf90_put_att( ncid, x_varid, "units", "degrees east" ) )
+
+      CALL Check( nf90_def_var( ncid, "time", NF90_INT, time_dimid, time_varid ) )
       CALL Check( nf90_put_att( ncid, time_varid, "long_name", "minutes since an unknown time" ) )
       CALL Check( nf90_put_att( ncid, time_varid, "units", "minutes" ) )
 
@@ -394,7 +424,7 @@ CONTAINS
 
       CALL Check( nf90_put_var( ncid, x_varid, lon ) )
       CALL Check( nf90_put_var( ncid, y_varid, lat ) )
-      CALL Check( nf90_put_var( ncid, z_varid, z_regridded + 6371.0D0 ) )
+      CALL Check( nf90_put_var( ncid, z_varid, z_regridded ) )
       CALL Check( nf90_put_var( ncid, time_varid, time ) )
       CALL Check( nf90_put_var( ncid, temperature_varid, regridded_temperature, recStart, recCount ) )
       CALL Check( nf90_put_var( ncid, density_varid, regridded_density, recStart, recCount ) )
